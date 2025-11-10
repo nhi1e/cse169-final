@@ -3,7 +3,7 @@ let streams = [];
 
 const confessions = [
 	"Dear Milena, I wishthe world were ending tomorrow...",
-	"Perhaps we don’t love unreasonably because we think we have time...",
+	"Perhaps we don\’t love unreasonably because we think we have time...",
 	"But what if we don't have time? Or what if time, as we know it, is irrelevant?...",
 ];
 
@@ -40,7 +40,7 @@ function makeStream(i) {
 		speedY: random(-0.6, 0.6),
 		opacity: random(200, 255),
 		life: 0, // counts frames since creation
-		stayFrames: int(random(300, 600)), // how long to stay fully visible before fading (~5–10 seconds)
+		stayFrames: int(random(300, 600)),
 		fadingOut: false,
 	};
 }
@@ -54,10 +54,9 @@ function draw() {
 	for (let s of streams) {
 		pg.push();
 		pg.translate(s.x, s.y);
-		// pg.fill(255, s.opacity);
 		let flicker = map(sin(frameCount * 0.12 + s.x * 0.01), -1, 1, 0.95, 1.08);
 		pg.fill(255, s.opacity * flicker);
-		pg.text(s.text, 0, 0, width * 0.45); // 45% of screen width; adjust 0.35–0.55 to taste
+		pg.text(s.text, 0, 0, width * 0.45); 
 
 		pg.pop();
 
