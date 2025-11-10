@@ -54,10 +54,17 @@ function draw() {
 	for (let s of streams) {
 		let depthScale = s.depth;
 		pg.push();
-		pg.translate(s.x, s.y * depthScale); // stretched vertically
-		pg.scale(1.0 + (1.5 - depthScale) * 0.2); // slight scaling by depth
-		pg.fill(255, s.opacity * (2.0 - depthScale));
+		pg.translate(s.x, s.y);
+		pg.scale(1, 1.6); // scale 60% taller; adjust to taste
 		pg.text(s.text, 0, 0, width * 0.4);
+		pg.pop();
+
+		// pg.push();
+		// pg.translate(s.x, s.y * depthScale); // stretched vertically
+		// pg.scale(1.0 + (1.5 - depthScale) * 0.2); // slight scaling by depth
+		pg.fill(255, s.opacity * (2.0 - depthScale));
+
+		// pg.text(s.text, 0, 0, width * 0.4);
 		pg.pop();
 
 		s.x += s.speedX;
