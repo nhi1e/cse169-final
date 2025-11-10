@@ -3,7 +3,7 @@ let streams = [];
 
 const confessions = [
 	"Dear Milena, I wishthe world were ending tomorrow...",
-	"Perhaps we don\’t love unreasonably because we think we have time...",
+	"Perhaps we don’t love unreasonably because we think we have time...",
 	"But what if we don't have time? Or what if time, as we know it, is irrelevant?...",
 ];
 
@@ -52,12 +52,12 @@ function draw() {
 	pg.translate(pg.width / 2, pg.height / 2);
 
 	for (let s of streams) {
+		let depthScale = s.depth;
 		pg.push();
-		pg.translate(s.x, s.y);
-		let flicker = map(sin(frameCount * 0.12 + s.x * 0.01), -1, 1, 0.95, 1.08);
-		pg.fill(255, s.opacity * flicker);
-		pg.text(s.text, 0, 0, width * 0.45); 
-
+		pg.translate(s.x, s.y * depthScale); // stretched vertically
+		pg.scale(1.0 + (1.5 - depthScale) * 0.2); // slight scaling by depth
+		pg.fill(255, s.opacity * (2.0 - depthScale));
+		pg.text(s.text, 0, 0, width * 0.4);
 		pg.pop();
 
 		s.x += s.speedX;
@@ -121,13 +121,14 @@ function makeStream(i) {
 		confessionIdx: i,
 		text: confessions[i],
 		x: random(-width / 3, width / 3),
-		y: random(-height / 3, height / 3),
-		// slower for readability with larger text
-		speedX: random(-0.4, 0.4),
-		speedY: random(-0.3, 0.3),
+		y: random(-height / 2, height / 2),
+		speedX: random(-0.3, 0.3),
+		speedY: random(0.4, 1.2), // downward motion
 		opacity: random(220, 255),
 		life: 0,
-		stayFrames: int(random(360, 720)), // linger ~6–12s
+		stayFrames: int(random(480, 900)),
 		fadingOut: false,
+		waveOffset: random(TWO_PI),
+		depth: random(0.5, 1.5),
 	};
 }
