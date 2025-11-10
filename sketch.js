@@ -109,7 +109,7 @@ function resetStream(s) {
 	s.speedY = random(-0.6, 0.6);
 	s.opacity = random(200, 255);
 	s.life = 0;
-	s.stayFrames = int(random(300, 600)); // linger 5–10s
+	s.stayFrames = int(random(1000, 2000)); // linger 5–10s
 	s.fadingOut = false;
 }
 
