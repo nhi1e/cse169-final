@@ -5,6 +5,7 @@ precision mediump float;
 uniform sampler2D tex0;   // color buffer
 uniform sampler2D texID;  // ID buffer
 uniform float time;
+uniform float dartMode;
 
 varying vec2 vTexCoord;
 
@@ -53,7 +54,11 @@ void main() {
     float b2 = smoothstep(bandWidth, 0.0, dist2);
     float combined = clamp(b1 + b2, 0.0, 1.0);
 
-    uv.y = (uv.y - 0.5) * (1.0 + 1.6 * combined) + 0.5;
+    float stretchAmount = 1.6 * (1.0 - 0.65 * dartMode);  
+    // dartMode=1 → stretch=0.56 instead of 1.6
+
+    uv.y = (uv.y - 0.5) * (1.0 + stretchAmount * combined) + 0.5;
+
 
     // ---------- BASE COLOR AFTER DISTORTION ----------
     vec3 col = texture2D(tex0, uv).rgb;

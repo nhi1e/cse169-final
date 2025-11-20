@@ -163,9 +163,14 @@ function drawDriftMode() {
 function drawDartMode() {
 	background("#0000ff");
 
-	// Milena-style camera: move eye based on mouse to get "entering" depth feel
-	let eyeX = map(mouseX, 0, width, -1200, 1200);
-	let eyeY = map(mouseY, 0, height, -1200, 1200);
+	// ====== AUTO CAMERA DRIFT ======
+	let t = millis() * 0.00015; // speed of drift (slow)
+	let driftX = noise(t) * 2.0 - 1.0;
+	let driftY = noise(t + 1000.0) * 2.0 - 1.0;
+
+	// scale to same range as mouse-controlled version
+	let eyeX = driftX * 900; // adjust strength here
+	let eyeY = driftY * 900; // adjust strength here
 	let eyeZ = height / 2.0 / tan((PI * 30.0) / 180.0);
 
 	camera(
@@ -236,8 +241,8 @@ function drawDartMode() {
 		pop();
 
 		// optional gentle motion in dart mode so they aren't perfectly locked
-		s.x += s.speedX * 0.1;
-		s.y += s.speedY * 0.1;
+		s.x += s.speedX * 0.04;
+		s.y += s.speedY * 0.04;
 		s.life++;
 
 		if (s.life > s.stayFrames) s.fadingOut = true;
@@ -252,6 +257,7 @@ function drawDartMode() {
 	shader(myShader);
 	myShader.setUniform("tex0", frame);
 	myShader.setUniform("time", millis() / 1000);
+	myShader.setUniform("dartMode", 1.0); // ALWAYS soft inside mode 2
 
 	beginShape(TRIANGLES);
 	vertex(-1, -1, 0, 0, 1);
