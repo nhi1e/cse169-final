@@ -1,6 +1,10 @@
 #ifdef GL_ES
 precision mediump float;
 #endif
+uniform float waveFreq[64];
+uniform float wavePhase[64];
+uniform float waveAmp[64];
+uniform int streamCount;
 
 uniform sampler2D tex0;
 uniform float time;

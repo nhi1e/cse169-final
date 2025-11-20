@@ -3,6 +3,7 @@ let font, myShader, pg;
 let streams = [];
 let socket;
 let messages = [];
+let fontMain, fontAlt;
 
 const confessions = [
 	"Then I could take the next train, arrive at your doorstep in Vienna, and say: ‘Come with me, Milena. We are going to love each other without scruples or fear or restraint. Because the world is ending tomorrow.’",
@@ -12,7 +13,8 @@ const confessions = [
 ];
 
 function preload() {
-	font = loadFont("NewRodinPro.otf");
+	fontMain = loadFont("NewRodinPro.otf");
+	fontAlt = "Times New Roman"; // built-in system font
 	myShader = loadShader("shader.vert", "shader.frag");
 }
 
@@ -25,7 +27,7 @@ function setup() {
 	);
 	socket.on("connect_error", (err) =>
 		console.log("BIGSCREEN: MAIN socket error", err)
-	);	
+	);
 	pixelDensity(1);
 	const canvas = createCanvas(windowWidth, windowHeight, WEBGL);
 
@@ -40,7 +42,7 @@ function setup() {
 
 	pg = createGraphics(width, height);
 	pg.pixelDensity(1);
-	pg.textFont(font);
+	pg.textFont(fontMain);
 	pg.textSize(min(width, height) * 0.05);
 	pg.textAlign(CENTER, CENTER);
 
@@ -50,7 +52,6 @@ function setup() {
 	for (let line of confessions) {
 		streams.push(makeTextStream(line));
 	}
-
 }
 
 function makeStream(i) {
@@ -75,30 +76,59 @@ function draw() {
 	pg.translate(pg.width / 2, pg.height / 2);
 
 	for (let s of streams) {
-		let depthScale = s.depth;
+		
 		pg.push();
 		pg.translate(s.x, s.y);
 		pg.scale(1, 1.6);
-		pg.fill(255, s.opacity * (2.0 - s.depth)); // ← ADD THIS
-		pg.text(s.text, 0, 0, width * 0.4);
+		pg.fill(255, s.opacity * (2.0 - s.depth));
+
+		let fontSize = min(width, height) * 0.05;
+		let lineSpacing = fontSize * 1.2;
+		let totalHeight = s.lines.length * lineSpacing;
+		let startY = -totalHeight / 2;
+
+		// ----- DRAW EACH LINE -----
+		for (let line of s.lines) {
+			// compute line width based on char count
+			let lineWidth = line.length * (fontSize * 0.6);
+			let cursorX = -(lineWidth / 2);
+
+			pg.push();
+			pg.translate(0, startY);
+
+			// ----- DRAW EACH CHARACTER -----
+			for (let c of line) {
+				c.timer++;
+				if (c.timer > c.switchRate) {
+					c.useAlt = !c.useAlt;
+					c.timer = 0;
+				}
+
+				pg.textFont(c.useAlt ? fontAlt : fontMain);
+				pg.textSize(fontSize);
+				pg.text(c.ch, cursorX, 0);
+
+				cursorX += fontSize * 0.6;
+			}
+
+			pg.pop();
+			startY += lineSpacing;
+		}
+
 		pg.pop();
 
-		// pg.text(s.text, 0, 0, width * 0.4);
+		// ----- MOTION + FADE LOGIC -----
+		s.x += s.speedX * 0.25;
+		s.y += s.speedY * 0.25;
 
-		s.x += s.speedX;
-		s.y += s.speedY;
 		s.life++;
 
-		// Only start fading after stayFrames have passed
 		if (s.life > s.stayFrames) {
 			s.fadingOut = true;
 		}
-
 		if (s.fadingOut) {
-			s.opacity -= 1.0; // slow fade-out
+			s.opacity -= 1.0;
 		}
-
-		// Reset when fully faded or offscreen
 		if (s.opacity <= 0 || abs(s.x) > width / 2.2 || abs(s.y) > height / 2.2) {
 			resetStream(s);
 		}
@@ -106,6 +136,7 @@ function draw() {
 
 	pg.pop();
 
+	// ----- SHADER PASS -----
 	shader(myShader);
 	myShader.setUniform("tex0", pg);
 	myShader.setUniform("time", millis() / 1000.0);
@@ -131,13 +162,11 @@ function resetStream(s) {
 	s.fadingOut = false;
 }
 
-function windowResized() {
-	resizeCanvas(windowWidth, windowHeight);
+function setupBuffer() {
 	pg = createGraphics(width, height);
 	pg.pixelDensity(1);
-	pg.textFont(font);
-	pg.textSize(min(width, height) * 0.05); // ~4% of canvas size
-
+	pg.textFont(fontMain);
+	pg.textSize(min(width, height) * 0.05);
 	pg.textAlign(CENTER, CENTER);
 }
 
