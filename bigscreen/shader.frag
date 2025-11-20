@@ -13,12 +13,10 @@ float noise(vec2 st) {
 void main() {
   vec2 uv = vTexCoord;
 
-  // --- Base noise distortion (glitchy texture movement) ---
   float n = noise(uv * 8.0 + time * 0.5);
   uv.x += (n - 0.5) * 0.006;
   uv.y += (n - 0.5) * 0.006;
 
-  // --- Dual moving wave-bands of stretch ---
   float bandWidth = 0.25;                      // width of the stretch zones
   float bandCenter1 = 0.5 + 0.4 * sin(time * 0.25);
   float bandCenter2 = 0.5 - 0.4 * sin(time * 0.3 + 1.57);
@@ -33,23 +31,18 @@ void main() {
   uv.y = (uv.y - 0.5) * stretch + 0.5;
   uv.y = clamp(uv.y, 0.001, 0.999);
 
-
-  // --- RGB split (chromatic aberration) ---
   float shift = 0.0015;
   vec3 col;
   col.r = texture2D(tex0, uv + vec2(shift, 0.0)).r;
   col.g = texture2D(tex0, uv).g;
   col.b = texture2D(tex0, uv - vec2(shift, 0.0)).b;
 
-  // --- Iridescent shimmer ---
   col.r += 0.02 * sin(time + uv.y * 40.0);
   col.b += 0.02 * sin(time * 0.7 + uv.x * 50.0);
 
-  // --- Bloom / brightness pulse ---
   float brightness = smoothstep(0.6, 1.0, dot(col, vec3(0.333)));
   col += brightness * 0.15;
 
-  // --- Gentle flicker overlay ---
   float flicker = 0.02 * sin(time * 3.0 + uv.y * 10.0);
   col += vec3(flicker);
   col *= 1.2;  // or 1.3 for stronger boost
