@@ -1,54 +1,76 @@
 #ifdef GL_ES
 precision mediump float;
 #endif
-uniform float waveFreq[64];
-uniform float wavePhase[64];
-uniform float waveAmp[64];
-uniform int streamCount;
 
-uniform sampler2D tex0;
+uniform sampler2D tex0;   // color buffer
+uniform sampler2D texID;  // ID buffer
 uniform float time;
+
 varying vec2 vTexCoord;
 
-float noise(vec2 st) {
-  return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+// ------------------ noise helpers ---------------------
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
 }
 
+float noise2D(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float noise(vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+}
+
+// -------------------------------------------------------
+
 void main() {
-  vec2 uv = vTexCoord;
+    vec2 uv = vTexCoord;
 
-  float n = noise(uv * 8.0 + time * 0.5);
-  uv.x += (n - 0.5) * 0.006;
-  uv.y += (n - 0.5) * 0.006;
+    // read encoded sentence ID
+    float sid = texture2D(texID, uv).r * 255.0;
+    float seed = fract(sin(sid * 12.3456) * 9876.543);
 
-  float bandWidth = 0.25;                      // width of the stretch zones
-  float bandCenter1 = 0.5 + 0.4 * sin(time * 0.25);
-  float bandCenter2 = 0.5 - 0.4 * sin(time * 0.3 + 1.57);
+    // ---------- TEXT DISTORTION ----------
+    float n = noise(uv * 8.0 + time * 0.5);
+    uv.x += (n - 0.5) * 0.006;
+    uv.y += (n - 0.5) * 0.006;
 
-  float dist1 = abs(uv.y - bandCenter1);
-  float dist2 = abs(uv.y - bandCenter2);
-  float band1 = smoothstep(bandWidth, 0.0, dist1);
-  float band2 = smoothstep(bandWidth, 0.0, dist2);
+    float bandWidth = 0.25;
+    float bandCenter1 = 0.5 + 0.4 * sin(time * (0.25 + seed * 0.2));
+    float bandCenter2 = 0.5 - 0.4 * sin(time * (0.30 + seed * 0.3) + 1.57);
 
-  float combinedBand = clamp(band1 + band2, 0.0, 1.0);
-  float stretch = 1.0 + 1.6 * combinedBand;    // increase for more dramatic elongation
-  uv.y = (uv.y - 0.5) * stretch + 0.5;
-  uv.y = clamp(uv.y, 0.001, 0.999);
+    float dist1 = abs(uv.y - bandCenter1);
+    float dist2 = abs(uv.y - bandCenter2);
 
-  float shift = 0.0015;
-  vec3 col;
-  col.r = texture2D(tex0, uv + vec2(shift, 0.0)).r;
-  col.g = texture2D(tex0, uv).g;
-  col.b = texture2D(tex0, uv - vec2(shift, 0.0)).b;
+    float b1 = smoothstep(bandWidth, 0.0, dist1);
+    float b2 = smoothstep(bandWidth, 0.0, dist2);
+    float combined = clamp(b1 + b2, 0.0, 1.0);
 
-  col.r += 0.02 * sin(time + uv.y * 40.0);
-  col.b += 0.02 * sin(time * 0.7 + uv.x * 50.0);
+    uv.y = (uv.y - 0.5) * (1.0 + 1.6 * combined) + 0.5;
 
-  float brightness = smoothstep(0.6, 1.0, dot(col, vec3(0.333)));
-  col += brightness * 0.15;
+    // ---------- BASE COLOR AFTER DISTORTION ----------
+    vec3 col = texture2D(tex0, uv).rgb;
 
-  float flicker = 0.02 * sin(time * 3.0 + uv.y * 10.0);
-  col += vec3(flicker);
-  col *= 1.2;  // or 1.3 for stronger boost
-  gl_FragColor = vec4(col, 1.0);
+    // ---------- GLSL DUST / STATIC ----------
+    vec2 duv = uv;
+    duv.x += time * 0.05;
+    duv.y += time * 0.03;
+
+    float fog = noise2D(duv * 2.0) * 0.15;
+    float mid = noise2D(duv * 40.0) * 0.12;
+    float sharp = (hash(duv * 500.0) - 0.5) * 0.08;
+
+    float dust = fog + mid + sharp;
+    dust *= 0.8 + 0.2 * sin(time * 3.0 + uv.x * 20.0);
+
+    col += vec3(dust);
+
+    gl_FragColor = vec4(col, 1.0);
 }
