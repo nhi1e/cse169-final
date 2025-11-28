@@ -1,27 +1,97 @@
-<!-- smallscreen/index.html -->
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
 <input id="msg" placeholder="your message" />
-<button onclick="sendMsg()">send</button>
+<button onclick="sendMsg()">send text</button>
+
+<button id="recordBtn" onclick="toggleRecording()">🎤 record</button>
+<!-- MUCH HIGHER RES FFT -->
+<canvas id="specCanvas" width="1200" height="400" style="display:none"></canvas>
 
 <script>
 	const socket = io("http://localhost:3000");
 
-	socket.on("connect", () => {
-		console.log("SMALLSCREEN: connected", socket.id);
-	});
+	let recording = false;
+	let mediaRecorder;
+	let audioChunks = [];
+	let audioCtx, analyser, sourceNode;
+	let fftCanvas = document.getElementById("specCanvas");
+	let fftCtx = fftCanvas.getContext("2d");
 
-	socket.on("connect_error", (err) => {
-		console.log("SMALLSCREEN: connect error", err);
-	});
+	socket.on("connect", () => console.log("SMALLSCREEN connected:", socket.id));
+	socket.on("connect_error", (err) => console.log("connect error:", err));
 
-	socket.on("newMessage", (msg) => {
-		console.log("SMALLSCREEN: message from bigscreen:", msg);
-	});
-
+	// SEND TEXT MESSAGE
 	function sendMsg() {
 		let text = document.getElementById("msg").value;
-		socket.emit("audienceMessage", text);
-		console.log("SMALLSCREEN: sent message", text);
+		socket.emit("audienceMessage", { type: "text", text });
+	}
+
+	// ==== AUDIO RECORDING + SPECTROGRAM ====
+	async function toggleRecording() {
+		if (!recording) {
+			recording = true;
+
+			let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+			// WebAudio FFT setup
+			audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+			analyser = audioCtx.createAnalyser();
+			analyser.fftSize = 1024;
+
+			sourceNode = audioCtx.createMediaStreamSource(stream);
+			sourceNode.connect(analyser);
+
+			// Begin recording raw audio
+			mediaRecorder = new MediaRecorder(stream);
+			audioChunks = [];
+			mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+
+			mediaRecorder.onstop = async () => {
+				console.log("recording stopped");
+
+				// Convert FFT to spectrogram image
+				let specDataUrl = await generateSpectrogram();
+
+				// send to bigscreen
+				socket.emit("audienceMessage", {
+					type: "audio",
+					spectrogram: specDataUrl,
+				});
+
+				console.log("sent spectrogram");
+			};
+
+			mediaRecorder.start();
+			document.getElementById("recordBtn").innerText = "⏹ stop";
+		} else {
+			recording = false;
+			mediaRecorder.stop();
+			document.getElementById("recordBtn").innerText = "🎤 record";
+		}
+	}
+
+	// ==== GENERATE SPECTROGRAM AS CANVAS IMAGE ====
+	async function generateSpectrogram() {
+		let width = fftCanvas.width;
+		let height = fftCanvas.height;
+
+		let tempArray = new Uint8Array(analyser.frequencyBinCount);
+
+		// Draw frequency bins as a vertical bar (simple spectrogram)
+		analyser.getByteFrequencyData(tempArray);
+
+		fftCtx.clearRect(0, 0, width, height);
+
+		let barWidth = width / tempArray.length;
+		for (let i = 0; i < tempArray.length; i++) {
+			let value = tempArray[i];
+			let h = (value / 255) * height;
+
+			// choose your spectrogram color
+			fftCtx.fillStyle = `rgb(${value}, ${255 - value}, 200)`;
+			fftCtx.fillRect(i * barWidth, height - h, barWidth, h);
+		}
+
+		return fftCanvas.toDataURL("image/png");
 	}
 </script>
