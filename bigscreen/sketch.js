@@ -55,13 +55,9 @@ function setup() {
 	socket.on("newMessage", (msg) => {
 		console.log("BIGSCREEN received:", msg);
 
-		// TEXT MESSAGE
 		if (msg.type === "text") {
 			streams.push(makeTextStream(msg.text));
-		}
-
-		// AUDIO SPECTROGRAM MESSAGE
-		else if (msg.type === "audio") {
+		} else if (msg.type === "audio") {
 			streams.push(makeSpectrogramStream(msg.spectrogram));
 		}
 	});
@@ -107,13 +103,15 @@ function drawDriftMode() {
 	for (let i = 0; i < streams.length; i++) {
 		let s = streams[i];
 
-		// ========== EXPIRATION CHECK (2 minutes) ==========
+		// ===== EXPIRATION CHECK (1 min) =====
 		if (!s.expired && millis() - s.createdAt > 60000) {
 			s.expired = true;
 			s.fadingOut = true;
-			console.log(
-				`[EXPIRE] Stream expired after 1 min: "${s.text.slice(0, 30)}..."`
-			);
+			if (s.text) {
+				console.log(
+					`[EXPIRE] Stream expired after 1 min: "${s.text.slice(0, 30)}..."`
+				);
+			}
 		}
 
 		// ----------------- DRAW -----------------
@@ -121,52 +119,50 @@ function drawDriftMode() {
 		pg.translate(s.x, s.y);
 		pg.scale(1, 1.6);
 
-		// === IMAGE STREAM ===
 		if (s.isImage) {
+			// IMAGE STREAM (spectrogram)
 			pg.tint(255, s.opacity);
 			let imgW = s.img.width * 0.35;
 			let imgH = s.img.height * 0.35;
 			pg.image(s.img, -imgW / 2, -imgH / 2, imgW, imgH);
-			pg.pop();
-			continue;
-		}
+		} else {
+			// TEXT STREAM
+			pg.tint(255, 255, 255, 255);
+			pg.fill(255, s.opacity * (2.0 - s.depth));
 
-		// === TEXT STREAM ===
-		pg.tint(255, 255, 255, i);
-		pg.fill(255, s.opacity * (2.0 - s.depth));
+			let fontSize = min(width, height) * 0.05;
+			let lineSpacing = fontSize * 1.2;
+			let totalHeight = s.lines.length * lineSpacing;
+			let startY = -totalHeight / 2;
 
-		let fontSize = min(width, height) * 0.05;
-		let lineSpacing = fontSize * 1.2;
-		let totalHeight = s.lines.length * lineSpacing;
-		let startY = -totalHeight / 2;
+			for (let line of s.lines) {
+				let lineWidth = line.length * (fontSize * 0.6);
+				let cursorX = -(lineWidth / 2);
 
-		for (let line of s.lines) {
-			let lineWidth = line.length * (fontSize * 0.6);
-			let cursorX = -(lineWidth / 2);
+				pg.push();
+				pg.translate(0, startY);
 
-			pg.push();
-			pg.translate(0, startY);
-
-			for (let c of line) {
-				c.timer++;
-				if (c.timer > c.switchRate) {
-					c.useAlt = !c.useAlt;
-					c.timer = 0;
+				for (let c of line) {
+					c.timer++;
+					if (c.timer > c.switchRate) {
+						c.useAlt = !c.useAlt;
+						c.timer = 0;
+					}
+					pg.textFont(c.useAlt ? fontAlt : fontMain);
+					pg.textSize(fontSize);
+					pg.text(c.ch, cursorX, 0);
+					cursorX += fontSize * 0.6;
 				}
-				pg.textFont(c.useAlt ? fontAlt : fontMain);
-				pg.textSize(fontSize);
-				pg.text(c.ch, cursorX, 0);
-				cursorX += fontSize * 0.6;
-			}
 
-			pg.pop();
-			startY += lineSpacing;
+				pg.pop();
+				startY += lineSpacing;
+			}
 		}
 
 		pg.noTint();
 		pg.pop();
 
-		// ----------------- MOTION -----------------
+		// ----------------- MOTION (shared) -----------------
 		s.x += s.speedX * 0.25;
 		s.y += s.speedY * 0.25;
 		s.life++;
@@ -177,26 +173,35 @@ function drawDriftMode() {
 		// ----------------- REMOVAL / RESET LOGIC -----------------
 		if (s.opacity <= 0) {
 			if (s.expired) {
-				console.log(
-					`[DELETE] Removed expired stream: "${s.text.slice(0, 30)}..."`
-				);
+				if (s.text) {
+					console.log(
+						`[DELETE] Removed expired stream: "${s.text.slice(0, 30)}..."`
+					);
+				} else {
+					console.log("[DELETE] Removed expired IMAGE stream");
+				}
 				streams.splice(i, 1);
 				i--;
 				continue;
 			}
 
-			console.log(
-				`[RESET] Recycling non-expired stream (confession): "${s.text.slice(
-					0,
-					30
-				)}..."`
-			);
+			// Non-expired → recycle (confessions, etc.)
+			if (s.text) {
+				console.log(
+					`[RESET] Recycling non-expired stream (confession): "${s.text.slice(
+						0,
+						30
+					)}..."`
+				);
+			}
 			resetStream(s);
 			continue;
 		}
 
+		// expired ones NEVER recycle even when drifting offscreen
 		if (s.expired) continue;
 
+		// edge reset
 		if (abs(s.x) > width / 2.2 || abs(s.y) > height / 2.2) {
 			resetStream(s);
 		}
@@ -243,19 +248,18 @@ function drawDartMode() {
 	scene3D.textAlign(CENTER, CENTER);
 	scene3D.fill("#f1f1f1");
 
-	// ====================================================
-	// MAIN STREAM LOOP
-	// ====================================================
 	for (let i = 0; i < streams.length; i++) {
 		let s = streams[i];
 
-		// ==================== IMAGE STREAM ====================
+		// IMAGE STREAMS (spectrograms) — big, drifting, cinematic
 		if (s.isImage) {
+			// expiration
 			if (!s.expired && millis() - s.createdAt > 60000) {
 				s.expired = true;
 				s.fadingOut = true;
 			}
 
+			// draw
 			scene3D.push();
 			scene3D.translate(s.x, s.y, 0);
 
@@ -265,11 +269,14 @@ function drawDartMode() {
 
 			scene3D.pop();
 
+			// motion
 			s.x += s.speedX * 0.04;
 			s.y += s.speedY * 0.04;
 
+			// fade
 			if (s.fadingOut) s.opacity -= 1.0;
 
+			// deletion / reset
 			if (s.opacity <= 0) {
 				if (s.expired) {
 					console.log("[DELETE] Removed IMAGE stream");
@@ -280,22 +287,32 @@ function drawDartMode() {
 				resetStream(s);
 				continue;
 			}
+
+			if (!s.expired) {
+				if (abs(s.x) > width / 2.2 || abs(s.y) > height / 2.2) {
+					resetStream(s);
+				}
+			}
+
 			continue;
 		}
 
-		// ======== EXPIRATION (1 min) ========
+		// ======== TEXT STREAMS BELOW ========
+
+		// EXPIRATION
 		if (!s.expired && millis() - s.createdAt > 60000) {
 			s.expired = true;
 			s.fadingOut = true;
-			console.log(
-				`[EXPIRE] "${s.text.slice(0, 30)}..." expired after 1 minute`
-			);
+			if (s.text) {
+				console.log(
+					`[EXPIRE] "${s.text.slice(0, 30)}..." expired after 1 minute`
+				);
+			}
 		}
 
-		// ======== BUILD ROTATION BUFFER ========
+		// ROTATION BUFFER
 		if (!s.rotChars) {
 			s.rotChars = [];
-
 			if (s.lines && s.lines.length > 0) {
 				for (let line of s.lines) {
 					for (let c of line) s.rotChars.push(c.ch);
@@ -304,12 +321,11 @@ function drawDartMode() {
 			} else if (s.text) {
 				s.rotChars = s.text.split("");
 			}
-
 			s.shiftRate = int(random(12, 18));
 			s.shiftTimer = 0;
 		}
 
-		// ======== ROTATION ========
+		// SLOW ROTATION
 		s.shiftTimer++;
 		if (s.shiftTimer > s.shiftRate && s.rotChars.length > 0) {
 			s.shiftTimer = 0;
@@ -319,10 +335,9 @@ function drawDartMode() {
 
 		let textStr = s.rotChars.length > 0 ? s.rotChars.join("") : s.text;
 
-		// ======== BOUNDING BOX ========
+		// BOUNDING BOX
 		let boxW = textStr.length * (fontSize * 0.6);
 		let boxH = fontSize * 1.2;
-
 		s.box = {
 			x: s.x - boxW / 2,
 			y: s.y - boxH / 2,
@@ -330,30 +345,27 @@ function drawDartMode() {
 			h: boxH,
 		};
 
-		// ======== OVERLAP PREVENTION ========
+		// OVERLAP PREVENTION
 		for (let j = 0; j < i; j++) {
 			let o = streams[j];
 			if (!o.box) continue;
-
 			let overlap = !(
 				s.box.x + s.box.w < o.box.x ||
 				s.box.x > o.box.x + o.box.w ||
 				s.box.y + s.box.h < o.box.y ||
 				s.box.y > o.box.y + o.box.h
 			);
-
 			if (overlap) {
 				s.y += boxH * 1.4;
 				s.box.y = s.y - boxH / 2;
 			}
 		}
 
-		// ======== DRAW TEXT ========
+		// DRAW TEXT
 		scene3D.push();
 		scene3D.translate(s.x, s.y, 0);
 
 		let cursorX = -(textStr.length * (fontSize * 0.6)) / 2;
-
 		for (let ch of textStr) {
 			scene3D.text(ch, cursorX, 0);
 			cursorX += fontSize * 0.6;
@@ -361,17 +373,19 @@ function drawDartMode() {
 
 		scene3D.pop();
 
-		// ======== MOTION / FADE ========
+		// MOTION / FADE
 		s.x += s.speedX * 0.04;
 		s.y += s.speedY * 0.04;
-
 		s.life++;
 		if (s.life > s.stayFrames) s.fadingOut = true;
 		if (s.fadingOut) s.opacity -= 1.0;
 
+		// DELETE OR RESET
 		if (s.opacity <= 0) {
 			if (s.expired) {
-				console.log(`[DELETE] Removed: "${s.text.slice(0, 30)}..."`);
+				if (s.text) {
+					console.log(`[DELETE] Removed: "${s.text.slice(0, 30)}..."`);
+				}
 				streams.splice(i, 1);
 				i--;
 				continue;
@@ -389,7 +403,7 @@ function drawDartMode() {
 
 	scene3D.pop();
 
-	// ======== SHADER PASS ========
+	// SHADER PASS
 	shader(myShader);
 	myShader.setUniform("tex0", scene3D);
 	myShader.setUniform("time", millis() / 1000);
@@ -426,9 +440,7 @@ function setupBuffer() {
 	pg.textAlign(CENTER, CENTER);
 }
 
-// ==========================================================
-// UNUSED STREAM MAKER
-// ==========================================================
+// Optional, not currently used
 function makeStream(i) {
 	return {
 		confessionIdx: i,
@@ -450,8 +462,8 @@ function makeStream(i) {
 // KEY SWITCHES
 // ==========================================================
 function keyPressed() {
-	if (key === "1") animMode = "drift"; // pg + shader
-	if (key === "2") animMode = "dart"; // Milena-style depth conveyor
+	if (key === "1") animMode = "drift";
+	if (key === "2") animMode = "dart";
 }
 
 function windowResized() {
@@ -487,7 +499,6 @@ function makeTextStream(text) {
 		warpSpeed: random(0.1, 0.5),
 		warpAmp: random(0.2, 1.4),
 
-		// NEW FIELDS FOR MESSAGE EXPIRY
 		createdAt: millis(),
 		expired: false,
 	};
