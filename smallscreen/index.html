@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+		<style>
+			@font-face {
+				font-family: "Rodin";
+				src: url("NewRodinPro.otf") format("opentype");
+				font-display: swap;
+			}
+		</style>
+
+		<link rel="stylesheet" href="style.css" />
+		<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+	</head>
+
+	<body>
+		<div id="container">
+			<h1 id="title">share a secret</h1>
+
+			<div id="modeSelector">
+				<button id="textModeBtn" class="modeBtn">text</button>
+				<button id="audioModeBtn" class="modeBtn">audio</button>
+			</div>
+
+			<div id="cooldownMsg"></div>
+
+			<!-- TEXT PANEL -->
+			<div id="textContainer" class="panel hidden">
+				<textarea id="textInput" placeholder="type something ..."></textarea>
+				<button id="textSubmit" class="sendBtn">send</button>
+			</div>
+
+			<!-- AUDIO PANEL -->
+			<div id="audioContainer" class="panel hidden">
+				<button id="recordBtn" class="recordBtn">
+					▶︎ •၊၊||၊|။|||| begin recording
+				</button>
+				<div id="recordTimer"></div>
+			</div>
+
+			<canvas id="specCanvas" width="1200" height="400"></canvas>
+		</div>
+
+		<script src="script.js"></script>
+	</body>
+</html>
